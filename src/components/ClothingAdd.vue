@@ -65,6 +65,13 @@ const panelBottom = ref(-1);
 const triggerEl = ref<HTMLElement | null>(null);
 const inputEl = ref<HTMLInputElement | null>(null);
 
+/** 打开时刻：用来吃掉「刚打开就紧跟一次 scroll」的抖动（见 close 的注释） */
+let openedAt = 0;
+function markOpen() {
+  open.value = true;
+  openedAt = Date.now();
+}
+
 const panelStyle = computed<CSSProperties>(() => ({
   ...(panelTop.value >= 0 ? { top: `${panelTop.value}px` } : { bottom: `${panelBottom.value}px` }),
   left: `${panelLeft.value}px`,
@@ -93,7 +100,7 @@ function place() {
   const el = triggerEl.value;
   if (!el) {
     // 测量失败就退回内联展开，至少功能可用
-    open.value = true;
+    markOpen();
     panelTop.value = -1;
     panelBottom.value = -1;
     focusInput.value = false;
@@ -103,14 +110,14 @@ function place() {
   const winH = window.innerHeight;
   const roomBelow = winH ? winH - r.bottom : PANEL_H + 1;
   if (roomBelow >= PANEL_H || !winH) {
-    open.value = true;
+    markOpen();
     panelTop.value = r.bottom + 8;
     panelLeft.value = r.left;
     panelWidth.value = r.width;
     panelBottom.value = -1;
     focusInput.value = false;
   } else {
-    open.value = true;
+    markOpen();
     panelTop.value = -1;
     panelLeft.value = r.left;
     panelWidth.value = r.width;
@@ -122,6 +129,10 @@ function place() {
 /** 供页面滚动时调用：滚动即关闭，避免面板与触发条错位 */
 function close() {
   if (!open.value) return;
+  // Web 特有的一帧抖动：点触发条时浏览器可能还在「滚动入视野」，scroll 事件在点击之后
+  // 才派发，页面级滚动监听会把刚打开的面板立刻关掉（真机上触摸滚动停在点击前，不会出现）。
+  // 打开后 300ms 内的关闭请求一律忽略，足以跨过这一帧，且不影响正常滑动关闭。
+  if (Date.now() - openedAt < 300) return;
   open.value = false;
   focusInput.value = false;
 }
