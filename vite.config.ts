@@ -15,8 +15,8 @@ export default defineConfig({
         short_name: '入住工具箱',
         description: '规则驱动的酒店入住工具箱：准备清单、入住与退房检查、证据分级知识库',
         lang: 'zh-CN',
-        theme_color: '#1c5a4a',
-        background_color: '#e9e6df',
+        theme_color: '#f5f7fa',
+        background_color: '#f5f7fa',
         display: 'standalone',
         start_url: '/hotel-toolbox/',
         icons: [

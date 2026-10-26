@@ -1,16 +1,19 @@
-// 应用状态（无路由库，四个视图足够 —— ponytail: 不上 vue-router）
+// 应用状态（无路由库：六个视图 + 四 tab 足够 —— 与小程序端页面结构一一对应）
 import { ref } from 'vue';
 import type { Stage, Stay } from './types';
 import { deleteStay as engineDelete, getStay, saveStay } from './engine';
 
-export const view = ref<'home' | 'wizard' | 'stay' | 'know' | 'gear'>('home');
+/** home / gear / know / mine 是四个 tab 页；wizard / stay 是在 tab 之外打开的页面 */
+export const view = ref<'home' | 'wizard' | 'stay' | 'know' | 'gear' | 'mine'>('home');
 export const stage = ref<Stage>('prep');
 export const currentStay = ref<Stay | null>(null);
 /** 知识库锚点：指定模块名时，知识库打开后滚动到该模块并展开 */
 export const knowModule = ref<string | null>(null);
 export const knowReturnTo = ref<'stay' | null>(null);
+/** 页面级弹层（好物抽屉 / 确认弹窗）打开时隐藏底部通栏导航，对应小程序 setTabBarHidden */
+export const tabBarHidden = ref(false);
 
-function phaseOf(s: Stay): 'future' | 'active' | 'ended' {
+export function phaseOf(s: Stay): 'future' | 'active' | 'ended' {
   if (!s.date) return 'future';
   const [y, m, d] = s.date.split('-').map(Number);
   const start = new Date(y, m - 1, d);
@@ -23,6 +26,8 @@ function phaseOf(s: Stay): 'future' | 'active' | 'ended' {
 }
 
 export function scrollTop() { window.scrollTo({ top: 0 }); }
+
+export function setTabBarHidden(hidden: boolean) { tabBarHidden.value = hidden; }
 
 /** 按日期推断当前阶段（聊02 定稿：系统自动把用户带到当前阶段） */
 export function suggestedStage(s: Pick<Stay, 'date' | 'nights'>): Stage {
@@ -64,6 +69,7 @@ export function goHome() { knowReturnTo.value = null; view.value = 'home'; scrol
 export function goKnowledge() { knowReturnTo.value = null; knowModule.value = null; view.value = 'know'; scrollTop(); }
 export function goWizard() { view.value = 'wizard'; scrollTop(); }
 export function goGear() { knowReturnTo.value = null; view.value = 'gear'; scrollTop(); }
+export function goMine() { knowReturnTo.value = null; view.value = 'mine'; scrollTop(); }
 export function backToStay() { knowReturnTo.value = null; view.value = 'stay'; scrollTop(); }
 /** 打开知识库并定位到指定模块（紧急入口、检查组互链共用）；from='stay' 时提供返回键 */
 export function goKnowledgeModule(module: string, from?: 'stay') {
@@ -86,3 +92,6 @@ export function fmtDate(date: string): string {
   const dt = new Date(y, m - 1, d);
   return `${m}月${d}日 · 周${'日一二三四五六'[dt.getDay()]}`;
 }
+
+/** 与小程序端一致的版本号（首页与「我的」页都会显示） */
+export const APP_VERSION = '1.0.0';
