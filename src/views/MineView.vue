@@ -26,9 +26,9 @@ import { Storage, listStays } from '../engine';
 import { exportDataExt, importDataExt } from '../extra';
 import { lineParas, toParas } from '../rich';
 import type { Para } from '../rich';
-import { APP_VERSION, setTabBarHidden } from '../store';
+import { APP_VERSION, clearSession, setTabBarHidden } from '../store';
 
-/** 版本号：与 package.json 的 version 保持一致，改版本只改这两处 */
+/** 版本号：构建期从 package.json 注入（vite define），此处不再手写 */
 const version = APP_VERSION;
 
 /**
@@ -42,6 +42,7 @@ const OWN_KEYS = [
   'htb_gear_v5',       // 好物（当前版本）
   'htb_gear_v4',       // 好物旧版（迁移残留）
   'htb_gear_v3',       // 好物旧版（迁移残留）
+  'htb_gear_corrupt',  // 好物损坏原文（platform.ts 隔离存档）
   'htb_ui_collapsed_v2', // 分组折叠状态（UI 层，v2 起按行程隔离）
   'htb_ui_collapsed_v1', // 旧版折叠状态（v1 全局共享，已废弃，清掉残留）
   'htb_ui_paneh_v1',    // 各段内容高度缓存（M17 首进提速，按行程隔离）
@@ -105,7 +106,8 @@ function doExport() {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    // 立即 revoke 在 Safari / Firefox 上偶发把下载一起取消，延后一拍更稳
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
     backupMsg.value = '已导出备份文件';
   } catch {
     backupMsg.value = '导出失败，请重试';
@@ -186,6 +188,8 @@ function clearAll() {
   // 走 engine 的 Storage（Web 下已被 platform.ts 换成 localStorage），
   // 而不是直接调 localStorage.removeItem —— 这样 node 测试里也能跑同一套逻辑。
   OWN_KEYS.forEach((k: string) => Storage.removeItem(k));
+  // 内存里可能还挂着刚删掉的行程：不清掉，下一次 persist() 会把它写回 storage
+  clearSession();
   backupMsg.value = '已清空本机全部数据';
   importText.value = '';
 }
@@ -231,6 +235,7 @@ function onModalCancel() {
       <div class="note">
         <div class="note-line"><span class="note-no">1</span><span>数据只存在本机。导出的 JSON 会存成备份文件，可在换设备或重装后导入恢复。</span></div>
         <div class="note-line"><span class="note-no">2</span><span>清理浏览器数据或缓存会一并清掉本机数据，重要数据请先导出。</span></div>
+        <div class="note-line"><span class="note-no">3</span><span>换了网址（例如从 GitHub Pages 换到 Cloudflare）后，旧站的数据不会自动带过来：先在旧站导出，再在这里导入。</span></div>
       </div>
       <div class="backuprow">
         <div class="btn small" @click="doExport">

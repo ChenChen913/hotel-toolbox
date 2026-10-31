@@ -13,18 +13,6 @@ export const knowReturnTo = ref<'stay' | null>(null);
 /** 页面级弹层（好物抽屉 / 确认弹窗）打开时隐藏底部通栏导航，对应小程序 setTabBarHidden */
 export const tabBarHidden = ref(false);
 
-export function phaseOf(s: Stay): 'future' | 'active' | 'ended' {
-  if (!s.date) return 'future';
-  const [y, m, d] = s.date.split('-').map(Number);
-  const start = new Date(y, m - 1, d);
-  const end = new Date(y, m - 1, d + s.nights - 1);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (today < start) return 'future';
-  if (today <= end) return 'active';
-  return 'ended';
-}
-
 export function scrollTop() { window.scrollTo({ top: 0 }); }
 
 export function setTabBarHidden(hidden: boolean) { tabBarHidden.value = hidden; }
@@ -57,10 +45,11 @@ export function stayPhaseLabel(s: Stay): string | null {
 
 export function openStay(id: string, afterCreate = false) {
   currentStay.value = getStay(id);
-  // 新建保存后绝不直接跳「退房」（用户预期：打包完成 → 准备或入住）；
-  // 重新打开时按日期自动定位。
-  const phase = currentStay.value ? phaseOf(currentStay.value) : 'future';
-  stage.value = afterCreate ? (phase === 'active' ? 'checkin' : 'prep')
+  // 新建保存后恒落「准备」：用户下一步是收拾行李，不是立刻做入住检查。
+  // （主线 wizard.ts 保存后是 redirectTo(...&stage=prep)，stay.ts 对 stage=prep 强制取值；
+  //   之前这里按日期推断，当天入住的新行程会直接跳到「入住检查」，与主线相反。）
+  // 重新打开旧行程时才按日期自动定位。
+  stage.value = afterCreate ? 'prep'
                             : (currentStay.value ? suggestedStage(currentStay.value) : 'prep');
   view.value = 'stay';
   scrollTop();
@@ -93,5 +82,16 @@ export function fmtDate(date: string): string {
   return `${m}月${d}日 · 周${'日一二三四五六'[dt.getDay()]}`;
 }
 
-/** 与小程序端一致的版本号（首页与「我的」页都会显示） */
-export const APP_VERSION = '1.0.0';
+/** 与小程序端一致的版本号口径：构建期从 package.json 注入，避免手改漂移 */
+export const APP_VERSION = __APP_VERSION__;
+
+/**
+ * 清空数据后重置会话态（不改变当前视图）。
+ * 不清的话 currentStay 仍指向已删除的行程，之后任何 persist() 都会把它写回 storage。
+ */
+export function clearSession() {
+  currentStay.value = null;
+  knowModule.value = null;
+  knowReturnTo.value = null;
+  stage.value = 'prep';
+}

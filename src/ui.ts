@@ -10,13 +10,15 @@ import { TOAST_MS } from './toast';
 export const toastShow = ref(false);
 export const toastText = ref('');
 
-let timer: number | undefined;
+// 不写 window.setTimeout：node（vitest）里没有 window，
+// 而 showToast 也被 platform 的写失败分支调用，必须能在非浏览器环境下跑。
+let timer: ReturnType<typeof setTimeout> | undefined;
 
 export function showToast(text: string): void {
   toastText.value = text;
   toastShow.value = true;
-  if (timer) window.clearTimeout(timer);
-  timer = window.setTimeout(() => {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => {
     toastShow.value = false;
   }, TOAST_MS);
 }
