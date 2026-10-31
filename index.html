@@ -11,12 +11,14 @@
   <meta property="og:description" content="规则驱动的酒店入住工具箱：准备清单、入住与退房检查、证据分级知识库。">
   <meta property="og:url" content="https://chenchen913.github.io/hotel-toolbox/">
   <meta name="twitter:card" content="summary">
-  <link rel="icon" type="image/svg+xml" href="/hotel-toolbox/icon.svg">
-  <link rel="apple-touch-icon" href="/hotel-toolbox/icon.svg">
+  <!-- %BASE_URL% 由 Vite 按部署路径替换：GitHub Pages 是 /hotel-toolbox/，Cloudflare 是 / -->
+  <link rel="icon" type="image/svg+xml" href="%BASE_URL%icon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icon-180.png">
   <title>酒店入住工具箱</title>
 </head>
 <body>
   <div id="app"></div>
+  <noscript>这个工具箱需要 JavaScript 才能运行。你的数据只保存在本机浏览器，不会上传。</noscript>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

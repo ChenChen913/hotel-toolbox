@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:cf": "node scripts/build-cf.mjs",
+    "deploy:cf": "npx --yes wrangler@4 pages deploy dist --project-name hotel-toolbox",
     "preview": "vite preview",
     "test": "vitest run"
   },

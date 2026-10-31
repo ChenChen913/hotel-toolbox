@@ -66,9 +66,9 @@ npm run dev
 
 | 环境变量 | 必填 | 默认值 | 说明 |
 |---------|------|--------|------|
-| （无） | — | — | 无后端、无外部服务，不需要任何环境变量 |
+| `BASE_PATH` | 否 | `/hotel-toolbox/` | 部署路径。GitHub Pages 项目页保持默认；Cloudflare Pages 用 `/`（`npm run build:cf` 已代设） |
 
-数据保存在浏览器 `localStorage`（行程键 `htb_stays_v1`，好物键 `htb_gear_v5`），不上传服务器。
+数据保存在浏览器 `localStorage`，不上传服务器。用到的键：`htb_stays_v1`（行程）、`htb_gear_v5`（好物，含 v4/v3 迁移源）、`htb_ext_v1`（住宿关系 / 天气温度等扩展）、`htb_ui_collapsed_v2`（分组折叠态）、`htb_stays_v1_corrupt` / `htb_gear_corrupt`（损坏原文隔离）。
 
 ## 项目结构
 
@@ -101,12 +101,28 @@ docs/
 技术栈：Vite、Vue 3、TypeScript、Vitest；图标为自绘 SVG（base64 内联，零第三方图标库）；通过 vite-plugin-pwa 支持安装到主屏与离线使用。
 
 ```sh
-npm test          # 运行测试（61 个用例）
+npm test          # 运行测试（67 个用例）
 npm run build     # 类型检查 + 产物构建
 npm run preview   # 本地预览构建产物
 ```
 
 推送到 main 后，GitHub Actions 会自动执行测试、构建并部署到 GitHub Pages（配置见 `.github/workflows/deploy.yml`）。
+
+### 部署到 Cloudflare Pages（可选，与 GitHub Pages 并行）
+
+同一份代码、同一个 commit，只差一个部署路径：
+
+```sh
+npm run build:cf      # BASE_PATH=/ 的构建（产物在 dist/）
+npm run deploy:cf     # wrangler pages deploy（首次会要求登录或提供 API Token）
+```
+
+也可以走 Cloudflare 控制台的 Git 集成：构建命令 `npm run build:cf`，输出目录 `dist`。
+仓库里已经放好 `wrangler.toml`、`public/_redirects`（SPA 回退）与 `public/_headers`（入口与 SW 不缓存、静态资源长缓存）。
+
+想让 GitHub Actions 自动发布到 Cloudflare，在仓库 Secrets 里加 `CLOUDFLARE_API_TOKEN`（权限：Account → Cloudflare Pages → Edit）与 `CLOUDFLARE_ACCOUNT_ID`；未配置时 `.github/workflows/deploy-cloudflare.yml` 会自动跳过，不会让 CI 变红。
+
+> ⚠️ 换域名（GitHub Pages ↔ Cloudflare Pages）等于换 origin：`localStorage` 不共享，旧站的数据要先在「我的」页导出，再到新站导入。
 
 ## 常见问题
 
@@ -123,7 +139,7 @@ A：设计定稿是固定规则驱动：规则可解释、可测试、离线可�
 A：好物记的是「哪件东西你认哪个牌子」，展示为「物品名称 + 品牌」（如「充电宝 · 小米」），品牌可以留空。清单每行的「＋ 好物」只显示这一件物品的品牌；「好物」页按分类汇总全部。
 
 **Q：好物的分类会自己选对吗？**
-A：会。输入物品名称时按关键词联想（14 个分类、300 多个关键词，覆盖常见叫法），猜不出就保持原样、不会瞎猜。**联想只是省一步，随时可以点标签改**；一旦你手动点过分类，后面再改名称也不会覆盖你的选择。
+A：会。输入物品名称时按关键词联想（18 个分类、412 个关键词，覆盖常见叫法），猜不出就保持原样、不会瞎猜。**联想只是省一步，随时可以点标签改**；一旦你手动点过分类，后面再改名称也不会覆盖你的选择。
 
 ## 已知限制
 

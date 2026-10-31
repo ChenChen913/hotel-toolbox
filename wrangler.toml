@@ -1,0 +1,6 @@
+# Cloudflare Pages 项目配置
+# 部署：npm run build:cf && npm run deploy:cf
+# 也可以在 Cloudflare 控制台接 Git：构建命令 npm run build:cf，输出目录 dist。
+name = "hotel-toolbox"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"

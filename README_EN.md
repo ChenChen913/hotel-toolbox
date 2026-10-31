@@ -49,50 +49,67 @@ Open <http://localhost:5173/hotel-toolbox/>.
 
 ## Usage
 
-The main flow has five steps:
+The main flow:
 
-1. Click "创建一次入住" (create a stay) on the home page and answer 5 short questions (dates and nights, guests, companions, purpose, preferences)
-2. The app generates a packing list (guest count is exact, up to 10) from 36 item rules; quantities are derived from guests and nights, and each item is tagged as "must bring / buy / bring from home"
-3. Check items off, adjust quantities, or add custom items (camera, medication, etc.)
-4. At the hotel, run the 15-item check-in check (fire observations and emergency supplies included); before leaving, run the 14-item checkout check
-5. The knowledge section holds 44 entries with evidence levels and sources across pre-trip, fire safety, privacy, hygiene, consumer rights and special scenarios, with a disclaimer up top, one-tap copy for emergency phrasing, a quick emergency button on the stay page and review reminders on time-sensitive law entries
+1. Click "创建一次入住" on the home page and walk the 7-step wizard (it collapses to 5 steps when "pack for others" is off): gender, dates and nights, guests, companions and relationship, scenario with weather/temperature, preferences, confirm
+2. The app generates the list from 56 item rules; quantities are derived from guests and nights. On the last step you can change quantities, drop an item to 0 (it moves to "not bringing", restorable anytime), or append custom items, clothing and cosmetics
+3. The stay page has three stages: prep (tick items, assign them to a guest, attach gear), check-in (15 items in 5 groups, including fire observations and emergency supplies) and checkout (14 items in 6 groups plus 2 deposit/bill checks)
+4. The knowledge section holds 44 entries in 11 modules with evidence levels, risk levels and sources, an evidence/risk legend, one-tap copy for emergency phrasing, and an emergency entry on the stay page
+5. The gear page collects item + brand pairs by category; the category is guessed from the item name (18 categories, 412 keywords) until you pick one manually
+6. The "Mine" page handles backup export/import (JSON file), disclaimer, privacy notes and clearing local data
 
-Stays are stored in the browser. The home page can duplicate the last stay as a template.
+Stays are stored in the browser. The home page can duplicate the last stay as a template (relationship and weather are carried over).
 
 ## Configuration
 
 | Environment variable | Required | Default | Notes |
 |---------------------|----------|---------|-------|
-| (none) | — | — | No backend, no external services, no environment variables |
+| `BASE_PATH` | No | `/hotel-toolbox/` | Deploy path. Keep the default for GitHub Pages project sites; Cloudflare Pages uses `/` (`npm run build:cf` sets it) |
 
-Data is stored in browser `localStorage` (key `htb_stays_v1`) and never uploaded.
+Data is stored in browser `localStorage` and never uploaded. Keys: `htb_stays_v1` (stays), `htb_gear_v5` (gear, plus v4/v3 migration sources), `htb_ext_v1` (relationship / weather / temperature extensions), `htb_ui_collapsed_v2` (collapsed groups), `htb_stays_v1_corrupt` / `htb_gear_corrupt` (quarantined corrupt payloads).
 
 ## Project structure
 
 ```
 src/
-├── data.ts            # Item rules, fixed checklists, knowledge entries
-├── engine.ts          # Rule evaluation and stay storage
-├── store.ts           # View state and date formatting
-├── components/        # Views and components (home, wizard, stay, knowledge, etc.)
-└── styles/global.css  # Design system (glass cards, control styles)
+├── data.ts             # 56 item rules, fixed checklists (15 check-in / 14 checkout), 44 knowledge entries
+├── types.ts            # Domain types (byte-identical with the mini-program codebase)
+├── engine.ts           # Rule evaluation, stay storage, gear collection
+├── extra.ts            # Extension layer: relationship, weather/temperature, purpose, extra items, deposit
+├── repair.ts           # Read repair and backup sanitising
+├── rich.ts             # Paragraph / bold parsing for knowledge bodies (no v-html)
+├── platform.ts         # Browser storage adapter (localStorage + read repair + write-failure toast)
+├── store.ts            # View state, date formatting, stage inference
+├── ui.ts / toast.ts    # Global toast and its copy/duration contract
+├── styles/
+│   ├── global.css      # Design tokens and utilities (cool grey + navy + amber)
+│   └── icons.css       # 49 self-drawn base64 icons (no icon library)
+├── components/         # AppIcon, Stepper, Toggle, ItemRow, DatePicker, ClothingAdd,
+│                       # GearPanel, ProgressPill, AppModal, AppToast, TabBar
+└── views/              # Six pages: Home / Wizard / Stay / Knowledge / Gear / Mine
 tests/
-└── engine.test.ts     # Rule engine tests
+├── engine.test.ts      # 38 upstream cases (unchanged)
+├── parity.test.ts      # 23 cases mirroring the mini-program extension/repair suites
+└── platform.test.ts    # 6 cases for the storage adapter
 docs/
-└── 规则表.md           # Rule design document (questionnaire, conditions, quantity formulas)
+└── 规则表.md            # Rule design document
 ```
 
 ## Development
 
-Stack: Vite, Vue 3, TypeScript, Vitest, icons by lucide-vue-next; installable and offline-capable via vite-plugin-pwa.
+Stack: Vite, Vue 3, TypeScript, Vitest; icons are self-drawn SVG (base64, no icon library); installable and offline-capable via vite-plugin-pwa.
 
 ```sh
-npm test          # Run tests (12 suites)
-npm run build     # Type check + production build
+npm test          # Run tests (67 cases)
+npm run build     # Type check + production build (GitHub Pages base)
+npm run build:cf  # Production build with base "/" for Cloudflare Pages
+npm run deploy:cf # Deploy dist/ to Cloudflare Pages via wrangler
 npm run preview   # Preview the production build locally
 ```
 
-On every push to main, GitHub Actions runs the tests, builds the app and deploys it to GitHub Pages (see `.github/workflows/deploy.yml`).
+On every push to main, GitHub Actions runs the tests, builds the app and deploys it to GitHub Pages (see `.github/workflows/deploy.yml`). An optional Cloudflare Pages workflow (`.github/workflows/deploy-cloudflare.yml`) runs in parallel and is skipped when `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are not configured.
+
+> Switching domains (GitHub Pages ↔ Cloudflare Pages) changes the origin, so `localStorage` is not shared: export a backup on the old site and import it on the new one.
 
 ## FAQ
 
@@ -107,8 +124,8 @@ A: The design settles on fixed rules: they are explainable, testable and work of
 
 ## Known limitations
 
-- Stay data lives in browser localStorage: clearing browser data deletes it. Use the backup/export card on the home page to save a JSON backup and import it back
-- Season is not inferred automatically; users tick "mosquito season" in the questionnaire. Destination weather is not integrated
+- Stay data lives in browser localStorage: clearing browser data deletes it. Use the backup card on the "Mine" page to export a JSON file and import it back
+- Weather and temperature are not fetched: you pick them in the wizard (no network); leaving them unset simply skips those rules
 - Quantities are suggestions (guests × (nights + 1) etc.), adjustable per item; items like wipes cannot be derived from headcount, adjust manually
 - V1.2 roadmap (from external review): full purchase-status loop (to buy / bought / already at home), independent age per child (full Guest model), desktop two-column layout
 
