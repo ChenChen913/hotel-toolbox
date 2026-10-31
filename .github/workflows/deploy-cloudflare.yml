@@ -50,6 +50,16 @@ jobs:
             echo "::notice title=Cloudflare 未配置::缺少 CLOUDFLARE_API_TOKEN 或 CLOUDFLARE_ACCOUNT_ID，跳过部署。"
           fi
 
+      - name: Ensure Pages project exists
+        if: steps.creds.outputs.ok == 'true'
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 首次部署前建好项目；已存在时这一步会报错，由 continue-on-error 兜住
+          command: pages project create hotel-toolbox --production-branch=main
+
       - name: Deploy
         if: steps.creds.outputs.ok == 'true'
         uses: cloudflare/wrangler-action@v3

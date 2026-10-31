@@ -117,6 +117,8 @@ npm run build:cf      # BASE_PATH=/ 的构建（产物在 dist/）
 npm run deploy:cf     # wrangler pages deploy（首次会要求登录或提供 API Token）
 ```
 
+首次部署前如果没有这个项目，先建一次：`npx wrangler pages project create hotel-toolbox --production-branch=main`。
+
 也可以走 Cloudflare 控制台的 Git 集成：构建命令 `npm run build:cf`，输出目录 `dist`。
 仓库里已经放好 `wrangler.toml`、`public/_redirects`（SPA 回退）与 `public/_headers`（入口与 SW 不缓存、静态资源长缓存）。
 
