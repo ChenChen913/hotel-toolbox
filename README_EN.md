@@ -9,7 +9,11 @@
 
 Rule-driven hotel stay toolbox: packing list, room & checkout checks, evidence-graded knowledge. No backend.
 
-Use it online: <https://chenchen913.github.io/hotel-toolbox/>
+Use it online:
+- GitHub Pages (primary): <https://chenchen913.github.io/hotel-toolbox/>
+- Cloudflare Pages (mirror): <https://hotel-toolbox.pages.dev/>
+
+> These are different origins, so local data is not shared; export a backup on the old site and import it on the new one.
 
 ## Table of Contents
 

@@ -11,7 +11,11 @@ Rule-driven hotel stay toolbox: packing list, room & checkout checks, evidence-g
 
 中文：规则驱动的酒店入住工具箱——准备清单、入住与退房检查、证据分级知识库。无后端，手机优先。
 
-在线使用：<https://chenchen913.github.io/hotel-toolbox/>
+在线使用：
+- GitHub Pages（主入口）：<https://chenchen913.github.io/hotel-toolbox/>
+- Cloudflare Pages（镜像）：<https://hotel-toolbox.pages.dev/>
+
+> 两个地址是不同 origin，本机数据不互通；换地址前先在「我的」页导出备份，到新地址导入。
 
 ## 目录
 
