@@ -18,7 +18,7 @@ import { EVIDENCE_META, KNOWLEDGE, RISK_META } from '../data';
 import { softDashes, toParas } from '../rich';
 import type { Para } from '../rich';
 import type { KnowledgeEntry } from '../types';
-import { backToStay, goHome, knowModule, knowReturnTo } from '../store';
+import { backToStay, knowModule, knowReturnTo } from '../store';
 import { showToast } from '../ui';
 
 interface EntryVM {
@@ -33,6 +33,8 @@ interface EntryVM {
   source: string;
   updated: string;
   hasCopy: boolean;
+  /** 复制话术原文：复制失败时展开给用户手动选中 */
+  copy: string;
   review: boolean;
   open: boolean;
   paras: Para[];
@@ -90,6 +92,7 @@ function buildModules(): ModuleVM[] {
         source: softDashes(k.source),
         updated: k.updated,
         hasCopy: !!k.copy,
+        copy: k.copy || '',
         review: needsReview(k),
         open: false,
         paras: toParas(k.body),
@@ -104,6 +107,8 @@ const total = ref(0);
 const modCount = ref(0);
 const modules = ref<ModuleVM[]>([]);
 const copiedId = ref('');
+/** 复制失败时展开原文，让「请手动选择」有东西可选 */
+const revealedCopyId = ref('');
 /** P1-1 回到顶部按钮显隐 */
 const showGoTop = ref(false);
 
@@ -111,7 +116,7 @@ const showGoTop = ref(false);
 const SCROLL_TOP_TRIGGER = 120;
 
 /** 从行程页「知识详解」跳进来时提供返回键；否则回首页（Web 无 tabBar 栈可 navigateBack） */
-const backLabel = computed(() => (knowReturnTo.value === 'stay' ? '返回行程' : '返回首页'));
+const backLabel = '返回行程';
 
 function onLoad() {
   eviList.value = Object.keys(EVIDENCE_META).map(k => ({
@@ -131,6 +136,9 @@ function onLoad() {
 function onShow() {
   const name = knowModule.value;
   if (!name) return;
+  // 一次性消费（对齐主线 core/nav.ts 的 takeNav）：用完就清，
+  // 否则下次从 tabBar 进知识库还会自动展开上次那个模块。
+  knowModule.value = null;
   const mi = modules.value.findIndex(m => m.name === name);
   if (mi < 0) return;
   // 锚点模块：用户是从行程页点「知识详解」跳进来的，直奔正文 ——
@@ -191,25 +199,51 @@ function toggleEntry(mi: number, ii: number) {
   mod.items[ii].open = !mod.items[ii].open;
 }
 
+/** 老浏览器 / 非安全上下文下的兜底：textarea + execCommand */
+function legacyCopy(text: string): boolean {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 async function copyEntry(id: string) {
   const k = KNOWLEDGE.find(x => x.id === id);
   if (!k || !k.copy) return;
+  let ok = false;
   try {
     await navigator.clipboard.writeText(k.copy);
+    ok = true;
+  } catch {
+    ok = legacyCopy(k.copy);
+  }
+  if (ok) {
+    revealedCopyId.value = '';
     copiedId.value = id;
     showToast('已复制');
     setTimeout(() => {
       if (copiedId.value === id) copiedId.value = '';
     }, 1500);
-  } catch {
-    showToast('复制失败，请长按选择');
+  } else {
+    // 复制彻底不可用（少数浏览器策略）时，把话术本身摊开 —— 至少能手动选中
+    revealedCopyId.value = id;
+    showToast('已展开话术，请手动选择复制');
   }
 }
 
-/** 返回行程 / 返回首页（源实现靠 stayId 兜底，Web 端 currentStay 由 store 维护） */
+/** 返回行程（这个入口只在 from='stay' 时渲染，见模板） */
 function backTap() {
-  if (knowReturnTo.value === 'stay') backToStay();
-  else goHome();
+  backToStay();
 }
 
 /** P1-1：滚动一点就显示「回到顶部」（每帧触发，只做布尔翻转判断，禁止构造大对象） */
@@ -228,8 +262,9 @@ function goTop() {
   <div class="page">
     <div class="bg-glow"></div>
 
-    <!-- 从行程页「知识详解」跳进来时的返回入口 -->
-    <div class="backbtn" @click="backTap()">
+    <!-- 从行程页「知识详解 / 紧急」跳进来时才显示返回；从 tabBar 进来靠底部导航回去
+         （主线 knowledge.wxml 的 showBack 就是这个口径，常驻会多出一个无处可去的入口） -->
+    <div v-if="knowReturnTo === 'stay'" class="backbtn" @click="backTap()">
       <AppIcon name="arrow-left" :size="28" tone="i" />
       <span>{{ backLabel }}</span>
     </div>
@@ -304,6 +339,7 @@ function goTop() {
                 <span>证据 {{ k.evi }}</span>
               </div>
               <span class="src-t">来源：{{ k.source }} · 核查于 {{ k.updated }}</span>
+              <div v-if="revealedCopyId === k.id" class="copytxt">{{ k.copy }}</div>
               <div v-if="k.hasCopy" class="copybtn" @click="copyEntry(k.id)">
                 <AppIcon name="copy" :size="22" tone="i" />{{ copiedId === k.id ? '已复制' : '复制话术' }}
               </div>
@@ -636,10 +672,24 @@ function goTop() {
   opacity: 0.7;
 }
 
+/* 复制失败时展开的原文：必须可选，否则「请手动选择」是句空话 */
+.copytxt {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  user-select: text;
+  -webkit-user-select: text;
+  word-break: break-word;
+}
+
 /* —— 回到顶部 —— */
 .gotop {
   position: fixed;
-  right: 16px;
+  right: max(16px, calc((100vw - 480px) / 2 + 16px));
   bottom: calc(80px + env(safe-area-inset-bottom));
   z-index: 950;
   display: flex;

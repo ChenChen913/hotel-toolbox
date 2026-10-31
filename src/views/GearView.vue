@@ -21,6 +21,8 @@ import { setTabBarHidden } from '../store';
 interface RowVM {
   name: string;
   brand: string;
+  /** 分类：删除时和 name/brand 一起定位，避免连点时用过期下标删错条目 */
+  cat: string;
   index: number;
 }
 interface GroupVM {
@@ -78,13 +80,22 @@ function reload() {
   const byCat = new Map<string, RowVM[]>();
   entries.forEach((e, i) => {
     const list = byCat.get(e.cat) || [];
-    list.push({ name: e.name, brand: e.brand || '', index: i });
+    list.push({ name: e.name, brand: e.brand || '', cat: e.cat, index: i });
     byCat.set(e.cat, list);
   });
   const gs: GroupVM[] = GEAR_CATS_EXT.filter(c => byCat.has(c)).map(cat => ({
     cat,
     rows: byCat.get(cat) || [],
   }));
+  // 兜底：不在 GEAR_CATS_EXT 里的分类（备份导入的旧数据 / 「自定义」）如果不并进来，
+  // 这些条目既看不见也删不掉，却计入「N 件」—— 数字和列表永远对不上。
+  const unknown = [...byCat.keys()].filter(c => !GEAR_CATS_EXT.includes(c));
+  if (unknown.length) {
+    const rows = unknown.flatMap(c => byCat.get(c) || []);
+    const other = gs.find(g => g.cat === '其他');
+    if (other) other.rows.push(...rows);
+    else gs.push({ cat: '其他', rows });
+  }
   groups.value = gs;
   total.value = entries.length;
 }
@@ -168,8 +179,16 @@ function save() {
   reload();
 }
 
-function del(i: number) {
-  if (Number.isNaN(i)) return;
+/**
+ * 删除一条好物。
+ * 用 {name, cat, brand} 在完整列表里重新定位，而不是直接用渲染时的下标：
+ * 连点两下时第二下拿到的还是旧下标，会删掉下一条（GearPanel 已用同口径修过）。
+ */
+function del(row: RowVM) {
+  if (!row || Number.isNaN(row.index)) return;
+  const all = listGear();
+  const i = all.findIndex(e => e.name === row.name && e.cat === row.cat && (e.brand || '') === row.brand);
+  if (i < 0) return;
   removeGear(i);
   reload();
 }
@@ -198,14 +217,14 @@ function del(i: number) {
           <span class="gcat">{{ g.cat }}</span>
           <span class="gcount num">{{ g.rows.length }} 件</span>
         </div>
-        <div v-for="row in g.rows" :key="row.index" class="gearitem">
+        <div v-for="row in g.rows" :key="`${row.cat}|${row.name}|${row.brand}|${row.index}`" class="gearitem">
           <div class="gicon"><AppIcon name="luggage" :size="26" tone="k" /></div>
           <div class="grow gtext">
             <span class="gname">{{ row.name }}</span>
             <span v-if="row.brand" class="gbrand">{{ row.brand }}</span>
             <span v-else class="gbrand gbrand-empty">没记品牌</span>
           </div>
-          <div class="pickdel" aria-label="删除" @click="del(row.index)">
+          <div class="pickdel" aria-label="删除" @click="del(row)">
             <AppIcon name="trash" :size="24" tone="k" />
           </div>
         </div>

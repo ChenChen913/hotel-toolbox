@@ -138,6 +138,21 @@ function loadCollapsed(stayId: string): Record<string, boolean> {
   }
 }
 
+/** 删除行程时连带清掉折叠态：id 不会复用，留着就是永久垃圾 */
+function clearCollapsed(stayId: string) {
+  try {
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    if (!raw) return;
+    const all = JSON.parse(raw) as unknown;
+    if (!all || typeof all !== 'object') return;
+    const store = all as CollapseStore;
+    delete store[stayId];
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify(store));
+  } catch {
+    /* 同上：UI 状态清不掉不影响数据正确性 */
+  }
+}
+
 function saveCollapsed(stayId: string, m: Record<string, boolean>) {
   try {
     const raw = localStorage.getItem(COLLAPSE_KEY);
@@ -708,6 +723,8 @@ function onModalConfirm() {
   const id = currentStay.value?.id || '';
   // 同步清掉扩展层里这个行程的关系记录，否则 storage 会随删除次数无限增长
   removeStayExt(id);
+  // 折叠态也是按行程存的，一并清掉（主线同位置清的是 removePaneH，Web 用折叠态替代）
+  clearCollapsed(id);
   // 源实现此处还 removePaneH（swiper 高度缓存）；Web 无 swiper、无高度缓存，见文件头说明
   removeCurrentStay();
 }
@@ -1377,7 +1394,8 @@ onUnmounted(() => {
 /* —— 回到顶部 —— */
 .gotop {
   position: fixed;
-  right: 16px;
+  /* 内容列居中 480px：按钮贴列右缘，而不是贴浏览器右缘 */
+  right: max(16px, calc((100vw - 480px) / 2 + 16px));
   bottom: calc(24px + env(safe-area-inset-bottom));
   z-index: 950;
   display: flex;

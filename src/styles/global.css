@@ -108,8 +108,11 @@ a { color: inherit; }
   margin: 0 auto;
   padding: 0 16px 32px;
 }
-/* tab 页底部给通栏导航留出空间 */
-.tabpage .page {
+/* tab 页底部给通栏导航留出空间。
+   用 :where() 把特异性压到 0-1-0：页面 scoped 的 .page[data-v-x]（0-2-0）要能覆盖它。
+   早期写成 .tabpage .page（0-2-0）与 scoped 规则同权，但 global.css 后加载，
+   结果把好物页的 160px / 知识库的 90px 全压成 64px —— 最后一行会被固定按钮盖住。 */
+:where(.tabpage) .page {
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 

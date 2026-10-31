@@ -1,7 +1,14 @@
 <script setup lang="ts">
 // 自定义确认弹窗（对应小程序 components/modal）—— 替代 window.confirm，视觉与全站一致。
 // z-index 1100 > 底部导航 1000；遮罩实色，不用 backdrop-filter。
-withDefaults(defineProps<{
+//
+// Web 端补充（主线在小程序里由平台兜住）：
+//   · 遮罩拦截 touchmove，弹窗打开时背景不跟着滚（主线 catchtouchmove="noop"）；
+//   · Esc = 取消，键盘可关；
+//   · 打开时锁 body 滚动，关闭后还原。
+import { onUnmounted, watch } from 'vue';
+
+const props = withDefaults(defineProps<{
   show: boolean;
   title?: string;
   content?: string;
@@ -12,10 +19,43 @@ withDefaults(defineProps<{
 }>(), { title: '', content: '', cancelText: '取消', confirmText: '确定', danger: false });
 
 const emit = defineEmits<{ cancel: []; confirm: [] }>();
+
+function onKey(e: KeyboardEvent) {
+  if (!props.show) return;
+  if (e.key === 'Escape') emit('cancel');
+  if (e.key === 'Enter') emit('confirm');
+}
+
+let prevOverflow = '';
+watch(() => props.show, (v) => {
+  if (typeof document === 'undefined') return;
+  if (v) {
+    prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+  } else {
+    document.body.style.overflow = prevOverflow;
+    window.removeEventListener('keydown', onKey);
+  }
+}, { immediate: true });
+
+onUnmounted(() => {
+  if (typeof document === 'undefined') return;
+  document.body.style.overflow = prevOverflow;
+  window.removeEventListener('keydown', onKey);
+});
 </script>
 
 <template>
-  <div v-if="show" class="mask" @click="emit('cancel')">
+  <div
+    v-if="show"
+    class="mask"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="title"
+    @click="emit('cancel')"
+    @touchmove.stop.prevent
+  >
     <div class="dialog" @click.stop>
       <div class="dlg-title">{{ title }}</div>
       <div class="dlg-body">{{ content }}</div>

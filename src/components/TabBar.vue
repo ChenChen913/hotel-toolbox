@@ -23,13 +23,19 @@ function onTab(i: number) {
 
 <template>
   <div class="tbwrap">
-    <div class="navbar">
+    <div class="navbar" role="tablist" aria-label="主导航">
       <div
         v-for="(t, i) in TABS"
         :key="t.text"
         class="tab"
         :class="{ on: selected === i }"
+        role="tab"
+        :aria-selected="selected === i"
+        :aria-label="t.text"
+        :tabindex="selected === i ? 0 : -1"
         @click="onTab(i)"
+        @keydown.enter.prevent="onTab(i)"
+        @keydown.space.prevent="onTab(i)"
       >
         <AppIcon :name="t.icon" :size="40" :tone="selected === i ? 'd' : ''" />
         <span class="tbtext">{{ t.text }}</span>

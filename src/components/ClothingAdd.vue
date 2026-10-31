@@ -67,6 +67,8 @@ const inputEl = ref<HTMLInputElement | null>(null);
 
 /** 打开时刻：用来吃掉「刚打开就紧跟一次 scroll」的抖动（见 close 的注释） */
 let openedAt = 0;
+/** 聚焦输入框的时刻：iOS 弹键盘会带一次视口滚动，同样不该把面板关掉 */
+let focusedAt = 0;
 function markOpen() {
   open.value = true;
   openedAt = Date.now();
@@ -126,13 +128,21 @@ function place() {
   }
 }
 
-/** 供页面滚动时调用：滚动即关闭，避免面板与触发条错位 */
-function close() {
+/**
+ * 关闭面板。
+ *
+ * @param force 用户主动关闭（点遮罩 / 点 ×）传 true，立即生效；
+ *              页面滚动触发的关闭传 false，要跨过两个「浏览器自己会动」的窗口：
+ *   · 打开后 300ms：点触发条时页面可能还在「滚动入视野」，scroll 事件在点击之后才派发；
+ *   · 聚焦后 600ms：iOS 弹出键盘会带一次视口滚动，否则点「自定义」会连面板一起关掉。
+ * 真机上触摸滚动停在点击之前，这两个窗口本来就不存在，属于 Web 平台补丁。
+ */
+function close(force = false) {
   if (!open.value) return;
-  // Web 特有的一帧抖动：点触发条时浏览器可能还在「滚动入视野」，scroll 事件在点击之后
-  // 才派发，页面级滚动监听会把刚打开的面板立刻关掉（真机上触摸滚动停在点击前，不会出现）。
-  // 打开后 300ms 内的关闭请求一律忽略，足以跨过这一帧，且不影响正常滑动关闭。
-  if (Date.now() - openedAt < 300) return;
+  if (!force) {
+    if (Date.now() - openedAt < 300) return;
+    if (focusedAt && Date.now() - focusedAt < 600) return;
+  }
   open.value = false;
   focusInput.value = false;
 }
@@ -161,6 +171,7 @@ function onAddCustom() {
 // 输入行常驻面板底部，focusInput 只是请求聚焦（对应小程序 input 的 focus 属性）
 watch(focusInput, (v) => {
   if (!v) return;
+  focusedAt = Date.now();
   nextTick(() => inputEl.value?.focus());
 });
 
@@ -186,18 +197,18 @@ defineExpose({ close });
          ① 类型列表用 .clist（scroll-view）接管滚动；
          ② 输入行常驻面板底部，列表末尾「自定义」只聚焦不关闭。 -->
   <Teleport to="body">
-    <div v-if="open" class="cmask" @click="close" @touchmove.stop.prevent>
+    <div v-if="open" class="cmask" @click="close(true)" @touchmove.stop.prevent>
       <div class="cpanel" :class="{ up: panelTop < 0 }" :style="panelStyle" @click.stop>
         <div class="chead">
           <span class="ctitle">选择{{ props.cat }}类型</span>
-          <div class="cclose" aria-label="关闭" @click="close">
+          <div class="cclose" aria-label="关闭" @click="close(true)">
             <AppIcon name="x" :size="28" tone="k" />
           </div>
         </div>
 
         <!-- M19：show-scrollbar 在 scroll-view 上需同时开启 enhanced 才生效（官方文档）。
              下方 classic 滚动条样式作为 WebView 兜底。 -->
-        <div class="clist">
+        <div class="clist" @touchmove.stop>
           <div v-for="t in props.types" :key="t" class="copt" @click="onPick(t)">{{ t }}</div>
           <div class="copt copt-custom" @click="onPickCustom">
             <AppIcon name="plus" :size="24" tone="p" />
@@ -303,6 +314,10 @@ defineExpose({ close });
   min-height: 0;
   max-height: 250px;
   overflow-y: auto;
+  /* 列表滚到底后不要把滚动链传给页面：页面一滚就会触发「滚动即关闭」，
+     用户挑到一半面板突然消失（桌面滚轮最容易复现）。 */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .clist::-webkit-scrollbar {
   width: 2px;
